@@ -26,6 +26,8 @@ import (
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	abci "github.com/cometbft/cometbft/abci/types"
+	cmtcrypto "github.com/cometbft/cometbft/crypto"
+	cmted25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -128,6 +130,16 @@ var (
 	_ runtime.AppI            = (*SimApp)(nil)
 	_ servertypes.Application = (*SimApp)(nil)
 )
+
+// KeyGenF is a function that generates a private key for use by comet.
+type KeyGenF = func() (cmtcrypto.PrivKey, error)
+
+// ValidatorKeyProvider returns a function that generates a private key for use by comet.
+func (a *SimApp) ValidatorKeyProvider() KeyGenF {
+	return func() (cmtcrypto.PrivKey, error) {
+		return cmted25519.GenPrivKey(), nil
+	}
+}
 
 // SimApp extends an ABCI application, but with most of its parameters exported.
 // They are exported for convenience in creating helper functions, as object
@@ -568,8 +580,9 @@ func NewSimApp(
 func (app *SimApp) Name() string { return app.BaseApp.Name() }
 
 // PreBlocker application updates every pre block
-func (app *SimApp) PreBlocker(ctx sdk.Context, _ *abci.RequestFinalizeBlock) (*sdk.ResponsePreBlock, error) {
-	return app.ModuleManager.PreBlock(ctx)
+func (app *SimApp) PreBlocker(ctx sdk.Context, _ *abci.FinalizeBlockRequest) error {
+	_, err := app.ModuleManager.PreBlock(ctx)
+	return err
 }
 
 // BeginBlocker application updates every begin block
@@ -587,7 +600,7 @@ func (app *SimApp) Configurator() module.Configurator {
 }
 
 // InitChainer application update at chain initialization
-func (app *SimApp) InitChainer(ctx sdk.Context, req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
+func (app *SimApp) InitChainer(ctx sdk.Context, req *abci.InitChainRequest) (*abci.InitChainResponse, error) {
 	var genesisState GenesisState
 	if err := json.Unmarshal(req.AppStateBytes, &genesisState); err != nil {
 		panic(err)
