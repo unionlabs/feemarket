@@ -28,13 +28,15 @@ type FeeMarketDeductDecorator struct {
 	accountKeeper   AccountKeeper
 	bankKeeper      BankKeeper
 	feemarketKeeper FeeMarketKeeper
+	stakingKeeper   StakingKeeper
 }
 
-func NewFeeMarketDeductDecorator(ak AccountKeeper, bk BankKeeper, fmk FeeMarketKeeper) FeeMarketDeductDecorator {
+func NewFeeMarketDeductDecorator(ak AccountKeeper, bk BankKeeper, fmk FeeMarketKeeper, sk StakingKeeper) FeeMarketDeductDecorator {
 	return FeeMarketDeductDecorator{
 		accountKeeper:   ak,
 		bankKeeper:      bk,
 		feemarketKeeper: fmk,
+		stakingKeeper:   sk,
 	}
 }
 
@@ -171,7 +173,16 @@ func (dfd FeeMarketDeductDecorator) PayOutFeeAndTip(ctx sdk.Context, fee, tip sd
 		))
 	}
 
-	proposer := sdk.AccAddress(ctx.BlockHeader().ProposerAddress)
+	proposerConsAddr := sdk.ConsAddress(ctx.BlockHeader().ProposerAddress)
+	val, err := dfd.stakingKeeper.ValidatorByConsAddr(ctx, proposerConsAddr)
+	if err != nil {
+		return err
+	}
+	valAddr, err := sdk.ValAddressFromBech32(val.GetOperator())
+	if err != nil {
+		return err
+	}
+	proposer := sdk.AccAddress(valAddr)
 	if !tip.IsNil() {
 		err := SendTip(dfd.bankKeeper, ctx, proposer, sdk.NewCoins(tip))
 		if err != nil {
