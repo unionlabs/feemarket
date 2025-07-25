@@ -183,7 +183,8 @@ func (dfd FeeMarketDeductDecorator) PayOutFeeAndTip(ctx sdk.Context, fee, tip sd
 		return err
 	}
 	proposer := sdk.AccAddress(valAddr)
-	if !tip.IsNil() {
+	// NOTE: Temorarily append logic to enable migration on all Union networks
+	if !tip.IsNil() && (ctx.ChainID() == "union-testnet-10" || params.DistributeFees) {
 		err := SendTip(dfd.bankKeeper, ctx, proposer, sdk.NewCoins(tip))
 		if err != nil {
 			return err
